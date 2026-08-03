@@ -1,64 +1,16 @@
+// Server-only pipeline: needs sharp and Node's Buffer. Importing this from a
+// browser bundle will fail — the client-safe helpers live in core/media.ts and
+// are re-exported from the package root.
+
 import sharp from 'sharp';
-import { createId } from '@paralleldrive/cuid2';
-import type {
-  StorageAdapter,
-  StoredMedia,
-  ImageSize,
-  MediaConfig,
-  ValidationResult,
-} from './types.js';
-
-const DEFAULT_MAX_SIZE = 5 * 1024 * 1024;
-const DEFAULT_ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-
-export const IMAGE_SIZES = {
-  thumbnail: { width: 300, height: 300, fit: 'cover' as const },
-  medium:    { width: 800, height: 600, fit: 'inside' as const },
-  large:     { width: 1200, height: 900, fit: 'inside' as const },
-};
-
-const SIZE_PREFIXES: Record<ImageSize, string> = {
-  original:  '',
-  thumbnail: 'thumb_',
-  medium:    'med_',
-  large:     'large_',
-};
-
-const SIZE_QUALITY: Record<ImageSize, number> = {
-  original:  95,
-  thumbnail: 80,
-  medium:    85,
-  large:     90,
-};
-
-export function validateImageFile(file: File, config?: MediaConfig): ValidationResult {
-  const maxSize  = config?.maxFileSize  ?? DEFAULT_MAX_SIZE;
-  const allowed  = config?.allowedTypes ?? DEFAULT_ALLOWED_TYPES;
-
-  if (file.size > maxSize) {
-    const mb = Math.round(maxSize / 1024 / 1024);
-    return { valid: false, error: `File too large (max ${mb}MB)` };
-  }
-  if (!allowed.includes(file.type)) {
-    return { valid: false, error: `Invalid file type. Allowed: JPEG, PNG, WebP` };
-  }
-  return { valid: true };
-}
-
-export function generateMediaKey(_originalName?: string): string {
-  // All processed output is WebP regardless of the uploaded format.
-  return `${createId()}.webp`;
-}
-
-export function getStorageKey(
-  prefix: string,
-  entityId: string,
-  filename: string,
-  size: ImageSize
-): string {
-  const sizePrefix = SIZE_PREFIXES[size];
-  return `${prefix}/${entityId}/${sizePrefix}${filename}`;
-}
+import type { StorageAdapter, StoredMedia, ImageSize, MediaConfig } from './types.js';
+import {
+  IMAGE_SIZES,
+  SIZE_QUALITY,
+  generateMediaKey,
+  getStorageKey,
+  validateImageFile,
+} from './media.js';
 
 export async function processAndStore(
   adapter: StorageAdapter,

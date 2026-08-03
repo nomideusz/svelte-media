@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.2.0 — 2026-08-03
+
+### Changed
+- **Breaking: the package is split into two entry points.** Storage adapters,
+  `processAndStore`, `deleteMedia` and `getMediaUrl` move to
+  `@nomideusz/svelte-media/server`; components, `validateImageFile`, the key
+  helpers, `IMAGE_SIZES` and the types stay on the root import.
+
+  Everything was previously behind one entry, and `core/process.ts` imported
+  `sharp` while `core/local-adapter.ts` imported `node:fs` and `node:path` at
+  module level. Any browser bundle that touched the package pulled those in and
+  failed to build — which means `ImageUpload` and `ImageGallery`, the two
+  exports that exist to be used from a component, could not be. The bug went
+  unnoticed because both apps in the source monorepo import only from server
+  files.
+
+  Migration: append `/server` to imports of the adapters or the pipeline. Key
+  helpers are re-exported from `/server` too, so a server file still needs one
+  import.
+
+### Added
+- A real demo at https://svelte-media-gamma.vercel.app/ — the components running
+  live, `validateImageFile` against files you choose, and the storage-key layout
+  for a prefix and entity you type. The server pipeline is shown as code, since
+  it cannot run in a browser.
+
+
 Backfilled 2026-08-02 from git history. Entries before that date are
 reconstructed from commits, so they record what changed rather than a release
 that was tagged at the time. 0.1.0 was published manually — trusted publishing

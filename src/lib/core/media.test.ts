@@ -4,7 +4,7 @@ import {
   generateMediaKey,
   getStorageKey,
   IMAGE_SIZES,
-} from './process.js';
+} from './media.js';
 
 describe('validateImageFile', () => {
   it('rejects files over 5MB', () => {

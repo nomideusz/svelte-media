@@ -1,3 +1,7 @@
+// Client-safe entry. The image pipeline and storage adapters need sharp,
+// node:fs and Buffer, so they live behind '@nomideusz/svelte-media/server' —
+// importing them here would break any browser bundle that touches a component.
+
 export type {
   StorageAdapter,
   S3Config,
@@ -7,20 +11,14 @@ export type {
   ValidationResult,
 } from './core/types.js';
 
-export type { LocalConfig } from './core/local-adapter.js';
-
-export { createS3Adapter } from './core/adapter.js';
-export { createLocalAdapter } from './core/local-adapter.js';
-
 export {
   validateImageFile,
   generateMediaKey,
   getStorageKey,
-  processAndStore,
-  deleteMedia,
-  getMediaUrl,
   IMAGE_SIZES,
-} from './core/process.js';
+  DEFAULT_MAX_SIZE,
+  DEFAULT_ALLOWED_TYPES,
+} from './core/media.js';
 
 export { default as ImageUpload } from './components/ImageUpload.svelte';
 export { default as ImageGallery } from './components/ImageGallery.svelte';

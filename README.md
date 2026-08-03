@@ -10,9 +10,18 @@ pluggable storage adapter — S3-compatible or local disk.
 pnpm add @nomideusz/svelte-media
 ```
 
-> Requires Svelte 5 (`^5.0.0`). The processing path is server-only: it uses
-> `sharp` and Node `Buffer`. Import `processAndStore` from server code
-> (`+page.server.ts`, a route handler, a script) — never from a component.
+> Requires Svelte 5 (`^5.0.0`).
+
+The package has two entry points, because half of it cannot run in a browser:
+
+| Import | Contains | Where |
+|---|---|---|
+| `@nomideusz/svelte-media` | components, `validateImageFile`, key helpers, `IMAGE_SIZES`, types | anywhere |
+| `@nomideusz/svelte-media/server` | storage adapters, `processAndStore`, `deleteMedia`, `getMediaUrl` | server only |
+
+The pipeline needs `sharp`, `node:fs` and `Buffer`. Keeping it behind `/server`
+is what lets a component import `ImageUpload` without a bundler dragging those
+into the browser build.
 
 ## Why
 
@@ -24,7 +33,7 @@ the seam.
 ## Quick Start
 
 ```ts
-import { createS3Adapter, processAndStore, getMediaUrl } from '@nomideusz/svelte-media';
+import { createS3Adapter, processAndStore, getMediaUrl } from '@nomideusz/svelte-media/server';
 
 const storage = createS3Adapter({
   endpoint:        process.env.S3_ENDPOINT!,     // https://xxx.r2.cloudflarestorage.com
@@ -79,7 +88,7 @@ interface StorageAdapter {
 Two ship with the package:
 
 ```ts
-import { createS3Adapter, createLocalAdapter } from '@nomideusz/svelte-media';
+import { createS3Adapter, createLocalAdapter } from '@nomideusz/svelte-media/server';
 
 createS3Adapter({ /* S3Config, above */ });   // R2, MinIO, Tigris, AWS
 createLocalAdapter({ root: '/data/images' }); // writes under root, mkdir -p
@@ -109,7 +118,7 @@ is only needed to reject early and report a friendlier message.
 ## Deleting
 
 ```ts
-import { deleteMedia } from '@nomideusz/svelte-media';
+import { deleteMedia } from '@nomideusz/svelte-media/server';
 
 // Removes all four sizes; individual failures are swallowed
 await deleteMedia(storage, stored.prefix, stored.entityId, stored.filename);
@@ -152,22 +161,22 @@ the same reason: it renders on the client, where the adapter cannot go.
 ## API
 
 ```ts
-// Adapters
+// ── @nomideusz/svelte-media/server ──
 createS3Adapter(config: S3Config): StorageAdapter
 createLocalAdapter(config: LocalConfig): StorageAdapter
-
-// Pipeline
 processAndStore(adapter, file, prefix, entityId, config?): Promise<StoredMedia>
 deleteMedia(adapter, prefix, entityId, filename): Promise<void>
 getMediaUrl(adapter, prefix, entityId, filename, size = 'medium'): string
-getStorageKey(prefix, entityId, filename, size): string   // `${prefix}/${entityId}/${sizePrefix}${filename}`
+
+// ── @nomideusz/svelte-media (client-safe) ──
 validateImageFile(file, config?): ValidationResult
 generateMediaKey(): string                                 // `<cuid2>.webp`
+getStorageKey(prefix, entityId, filename, size): string   // `${prefix}/${entityId}/${sizePrefix}${filename}`
 IMAGE_SIZES
-
-// Components
 ImageUpload, ImageGallery
 ```
+
+Key helpers are exported from both entries, so server code needs only one import.
 
 Types: `StorageAdapter`, `S3Config`, `LocalConfig`, `StoredMedia`, `ImageSize`,
 `MediaConfig`, `ValidationResult`.
