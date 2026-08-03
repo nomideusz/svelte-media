@@ -7,6 +7,7 @@ that was tagged at the time. The package has not been published to npm yet.
 ## Unreleased
 
 ### Added
+- Demo site at https://svelte-media-gamma.vercel.app/; `homepage` points at it.
 - README — the package's first, documenting the adapter seam, the four sizes,
   the `(prefix, entityId, filename)` key shape the helpers take, and the fact
   that all output is WebP regardless of what was uploaded.
