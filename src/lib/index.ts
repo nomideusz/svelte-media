@@ -9,6 +9,8 @@ export type {
   ImageSize,
   MediaConfig,
   ValidationResult,
+  ValidationConfig,
+  DeriveSource,
 } from './core/types.js';
 
 export {

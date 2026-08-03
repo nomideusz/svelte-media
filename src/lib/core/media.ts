@@ -3,7 +3,7 @@
 // can import it — see core/process.ts for the server pipeline.
 
 import { createId } from '@paralleldrive/cuid2';
-import type { ImageSize, MediaConfig, ValidationResult } from './types.js';
+import type { ImageSize, ValidationConfig, ValidationResult } from './types.js';
 
 export const DEFAULT_MAX_SIZE = 5 * 1024 * 1024;
 export const DEFAULT_ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
@@ -28,7 +28,7 @@ export const SIZE_QUALITY: Record<ImageSize, number> = {
   large:     90,
 };
 
-export function validateImageFile(file: File, config?: MediaConfig): ValidationResult {
+export function validateImageFile(file: File, config?: ValidationConfig): ValidationResult {
   const maxSize  = config?.maxFileSize  ?? DEFAULT_MAX_SIZE;
   const allowed  = config?.allowedTypes ?? DEFAULT_ALLOWED_TYPES;
 

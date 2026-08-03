@@ -58,6 +58,32 @@ touches a database.
 **Output is always WebP**, whatever was uploaded; `generateMediaKey` names every
 file `<cuid2>.webp` and ignores the original extension.
 
+## Deriving extras at upload time
+
+`processAndStore` already has the decoded bytes in memory. A `derive` hook lets
+you compute something from them in the same pass — a placeholder, a blurhash, a
+dominant colour, EXIF — instead of fetching the image back later:
+
+```ts
+import { generatePlaceholder } from '@nomideusz/svelte-geometrize/node';
+
+const stored = await processAndStore(storage, file, 'tours', tourId, {
+  derive: ({ buffer }) => generatePlaceholder(buffer),
+  onDeriveError: (err) => log.warn('placeholder failed', err),
+});
+
+stored.derived;   // GeometrizePlaceholder | undefined — inferred from the hook
+```
+
+The hook runs **after** every size is stored, and **failures do not propagate**:
+by that point the upload has succeeded, and rejecting would make the caller
+retry a completed upload — orphaning the objects already written. A failing
+hook leaves `derived` undefined and calls `onDeriveError`. Wire that to your
+logger, or the failure is silent.
+
+The package takes no dependency on whatever you derive; `TDerived` is inferred
+from the callback's return type.
+
 ## Sizes
 
 `processAndStore` always writes four variants:

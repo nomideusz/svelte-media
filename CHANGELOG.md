@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.3.0 — 2026-08-03
+
+### Added
+- **`derive` / `onDeriveError` on `MediaConfig`, and `derived` on `StoredMedia`.**
+  A hook over the decoded bytes during processing, so anything computed from the
+  image — placeholder, blurhash, dominant colour, EXIF — happens while the bytes
+  are in memory rather than fetching them back later. `TDerived` is inferred from
+  the callback, so the package takes no dependency on what you derive.
+
+  The hook runs after every size is stored, and failures deliberately do not
+  propagate: by then the upload has succeeded, and rejecting would make the
+  caller retry a completed upload and orphan the objects already written.
+  `derived` is left undefined and `onDeriveError` is called.
+
+
 ## 0.2.0 — 2026-08-03
 
 ### Changed

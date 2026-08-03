@@ -3,7 +3,7 @@
 // are re-exported from the package root.
 
 import sharp from 'sharp';
-import type { StorageAdapter, StoredMedia, ImageSize, MediaConfig } from './types.js';
+import type { StorageAdapter, StoredMedia, ImageSize, MediaConfig, DeriveSource } from './types.js';
 import {
   IMAGE_SIZES,
   SIZE_QUALITY,
@@ -12,13 +12,13 @@ import {
   validateImageFile,
 } from './media.js';
 
-export async function processAndStore(
+export async function processAndStore<TDerived = never>(
   adapter: StorageAdapter,
   file: File,
   prefix: string,
   entityId: string,
-  config?: MediaConfig
-): Promise<StoredMedia> {
+  config?: MediaConfig<TDerived>
+): Promise<StoredMedia<TDerived>> {
   const validation = validateImageFile(file, config);
   if (!validation.valid) throw new Error(validation.error);
 
@@ -48,7 +48,20 @@ export async function processAndStore(
   // ponytail: existing objects stay JPEG under their old keys — URLs derive
   // from the stored filename, so old rows keep working without migration.
 
-  return { filename, originalName: file.name, prefix, entityId, sizes };
+  // Runs last, so a throwing hook cannot orphan a half-written upload — and it
+  // is caught, because by this point the image is stored and rejecting would
+  // make the caller retry a completed upload.
+  let derived: TDerived | undefined;
+  if (config?.derive) {
+    const source: DeriveSource = { buffer, filename, mimeType: file.type };
+    try {
+      derived = await config.derive(source);
+    } catch (error) {
+      config.onDeriveError?.(error, source);
+    }
+  }
+
+  return { filename, originalName: file.name, prefix, entityId, sizes, derived };
 }
 
 export async function deleteMedia(
