@@ -1,5 +1,7 @@
 # @nomideusz/svelte-media
 
+[![npm](https://badgen.net/npm/v/@nomideusz/svelte-media)](https://www.npmjs.com/package/@nomideusz/svelte-media) [![license](https://badgen.net/badge/license/MIT/blue)](./LICENSE)
+
 Image upload, resizing and multi-size storage for Svelte 5 apps. One call takes
 a `File`, validates it, renders four sizes with sharp, and writes them through a
 pluggable storage adapter — S3-compatible or local disk.
