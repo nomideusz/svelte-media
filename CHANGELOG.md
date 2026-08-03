@@ -2,9 +2,11 @@
 
 Backfilled 2026-08-02 from git history. Entries before that date are
 reconstructed from commits, so they record what changed rather than a release
-that was tagged at the time. The package has not been published to npm yet.
+that was tagged at the time. 0.1.0 was published manually — trusted publishing
+cannot bootstrap a package that does not exist yet — and releases from 0.1.1 on
+go through the repo's Release & Publish workflow.
 
-## Unreleased
+## 0.1.1 — 2026-08-03
 
 ### Added
 - Demo site at https://svelte-media-gamma.vercel.app/; `homepage` points at it.

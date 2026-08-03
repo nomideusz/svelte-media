@@ -1,6 +1,6 @@
 {
   "name": "@nomideusz/svelte-media",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Image upload, processing, and S3-compatible storage for Svelte 5 apps.",
   "type": "module",
   "sideEffects": false,
