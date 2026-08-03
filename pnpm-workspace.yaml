@@ -1,0 +1,8 @@
+# Used only in github.com/nomideusz/svelte-media (not the asini monorepo).
+# pnpm 10+ blocks lifecycle scripts until approved; esbuild needs its
+# postinstall, and sharp downloads its native binaries in one.
+packages:
+  - '.'
+allowBuilds:
+  esbuild: true
+  sharp: true
