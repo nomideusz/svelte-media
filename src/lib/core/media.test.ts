@@ -1,9 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import {
   validateImageFile,
+  MediaValidationError,
   generateMediaKey,
   getStorageKey,
+  variantKey,
+  sizeForWidth,
+  parseStorageKey,
   IMAGE_SIZES,
+  SIZE_PREFIXES,
 } from './media.js';
 
 describe('validateImageFile', () => {
@@ -41,18 +46,105 @@ describe('validateImageFile', () => {
     const result = validateImageFile(file, { maxFileSize: 1024 * 1024 });
     expect(result.valid).toBe(false);
   });
+
+  it('carries machine-readable codes and limits for i18n mapping', () => {
+    const empty = validateImageFile(new File([], 'e.jpg', { type: 'image/jpeg' }));
+    expect(empty.code).toBe('empty');
+
+    const big = validateImageFile(
+      new File(['x'.repeat(1024 + 1)], 'b.jpg', { type: 'image/jpeg' }),
+      { maxFileSize: 1024 },
+    );
+    expect(big.code).toBe('file-too-large');
+    expect(big.maxBytes).toBe(1024);
+
+    const gif = validateImageFile(new File(['x'], 'b.gif', { type: 'image/gif' }));
+    expect(gif.code).toBe('invalid-type');
+    expect(gif.allowedTypes).toContain('image/jpeg');
+  });
+});
+
+describe('MediaValidationError', () => {
+  it('exposes the failed result as typed fields', () => {
+    const result = validateImageFile(
+      new File(['x'.repeat(2048)], 'b.jpg', { type: 'image/jpeg' }),
+      { maxFileSize: 1024 },
+    );
+    const err = new MediaValidationError(result);
+    expect(err).toBeInstanceOf(Error);
+    expect(err.name).toBe('MediaValidationError');
+    expect(err.code).toBe('file-too-large');
+    expect(err.maxBytes).toBe(1024);
+    expect(err.message).toMatch(/too large/i);
+  });
 });
 
 describe('generateMediaKey', () => {
-  it('produces a webp key regardless of input format', () => {
-    expect(generateMediaKey('photo.jpg')).toMatch(/\.webp$/);
-    expect(generateMediaKey('photo.png')).toMatch(/\.webp$/);
+  it('produces a webp key', () => {
+    expect(generateMediaKey()).toMatch(/\.webp$/);
   });
 
-  it('produces unique keys for same filename', () => {
-    const a = generateMediaKey('photo.jpg');
-    const b = generateMediaKey('photo.jpg');
-    expect(a).not.toBe(b);
+  it('produces unique keys', () => {
+    expect(generateMediaKey()).not.toBe(generateMediaKey());
+  });
+});
+
+describe('variantKey', () => {
+  it('inserts the size prefix before the filename of a joined key', () => {
+    expect(variantKey('schools/id-1/abc.webp', 'thumbnail')).toBe('schools/id-1/thumb_abc.webp');
+    expect(variantKey('schools/id-1/abc.webp', 'original')).toBe('schools/id-1/abc.webp');
+  });
+
+  it('agrees with getStorageKey for every size', () => {
+    const original = getStorageKey('tours', 't-1', 'x.webp', 'original');
+    for (const size of ['original', 'thumbnail', 'medium', 'large'] as const) {
+      expect(variantKey(original, size)).toBe(getStorageKey('tours', 't-1', 'x.webp', size));
+    }
+  });
+});
+
+describe('sizeForWidth', () => {
+  it('picks the smallest variant that still fills the display width', () => {
+    expect(sizeForWidth(undefined)).toBe('medium');
+    expect(sizeForWidth(200)).toBe('thumbnail');
+    expect(sizeForWidth(300)).toBe('thumbnail');
+    expect(sizeForWidth(301)).toBe('medium');
+    expect(sizeForWidth(800)).toBe('medium');
+    expect(sizeForWidth(801)).toBe('large');
+  });
+});
+
+describe('parseStorageKey', () => {
+  it('inverts getStorageKey for original keys', () => {
+    expect(parseStorageKey('schools/id-1/abc.webp')).toEqual({
+      prefix: 'schools',
+      entityId: 'id-1',
+      filename: 'abc.webp',
+    });
+  });
+
+  it('keeps multi-segment prefixes intact', () => {
+    expect(parseStorageKey('a/b/id/x.webp')).toEqual({
+      prefix: 'a/b',
+      entityId: 'id',
+      filename: 'x.webp',
+    });
+  });
+
+  it('returns null for keys that do not fit the layout (legacy ids)', () => {
+    expect(parseStorageKey('appwrite-file-id')).toBeNull();
+    expect(parseStorageKey('only/two')).toBeNull();
+  });
+});
+
+describe('SIZE_PREFIXES', () => {
+  it('is the stable cross-app contract for variant naming', () => {
+    expect(SIZE_PREFIXES).toEqual({
+      original: '',
+      thumbnail: 'thumb_',
+      medium: 'med_',
+      large: 'large_',
+    });
   });
 });
 

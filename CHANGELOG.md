@@ -1,5 +1,71 @@
 # Changelog
 
+## 0.5.0 — 2026-08-09
+
+### Added
+- **The read half of the pipeline.** `StorageAdapter` gains
+  `get(key): Promise<StorageObject | null>` (null = not found; real failures
+  reject), implemented by both adapters. Every deployment of this package was
+  serving from a private bucket, and both source apps had built parallel raw
+  S3 clients — three across the two apps — to work around the adapter being
+  write-only.
+- **`getSignedUrl(key, expiresIn?)` on the S3 adapter** (the `S3Adapter`
+  type), with expiry-buffered caching and in-flight dedupe — absorbed from
+  thebest's hand-rolled presign layer. This is what the previously-dead
+  `@aws-sdk/s3-request-presigner` dependency is now for.
+- **`serveMedia(adapter, key): Promise<Response>`** — the whole body of a
+  same-origin `/photos/[...key]`-style route: key validation (incl. `..`
+  traversal — one app's hand-written copy lacked the check), 404 on missing,
+  immutable cache headers.
+- **`createMediaStore({ adapter, ...limits, derive? })`** — the per-app
+  binding factory both apps had hand-built (`photo-storage.ts`, `media.ts`),
+  returning bound `store/remove/get/serve/url/signedUrl/validate`. Env reading
+  stays in the app; the adapter is the seam.
+
+### Changed
+- **Breaking for external adapter implementations:** `get` is now a required
+  `StorageAdapter` method. (Both in-repo apps consume the built-in adapters.)
+- `S3Config.publicUrl` is now optional — both real deployments serve private
+  buckets and were passing dummy values to satisfy the field. `getUrl()`
+  throws without it.
+
+## 0.4.0 — 2026-08-09
+
+### Added
+- **`SIZE_PREFIXES` and `SIZE_QUALITY` are now exported** (root and `/server`).
+  Both source apps had re-copied the prefix table by hand (one script copied the
+  quality values too) because the package kept them private — and the README had
+  already drifted from the code once (`lg_` vs `large_`). The variant naming is a
+  cross-app contract; now it has one home.
+- **Joined-key helpers** for apps that persist the single original key rather
+  than the (prefix, entityId, filename) triple: `variantKey(key, size)`,
+  `parseStorageKey(key)` (null for keys that don't fit the layout, e.g. legacy
+  ids), and `deleteMediaByKey(adapter, key)` on `/server`. Also
+  `sizeForWidth(width?)` — the smallest pre-generated variant that still fills a
+  display width (moved in from yoga's hand-rolled copy).
+- **Machine-readable validation.** `ValidationResult` gains
+  `code: 'empty' | 'file-too-large' | 'invalid-type'` plus `maxBytes` /
+  `allowedTypes`, and `processAndStore` now throws a typed
+  `MediaValidationError` carrying them — so a PL/EN/UK app maps `code` to its
+  own copy instead of surfacing the English `message`. Both apps had
+  re-implemented validation in 4 places purely to localize the strings.
+  The `empty` code also covers the zero-byte file every form action was
+  checking by hand.
+
+### Fixed
+- `ImageUpload`'s declared `config` prop was never read, so the client-side
+  pre-validation it implied never ran. It now validates each file before
+  `onUpload` and routes failures to `onError`.
+- README documented the large-variant prefix as `lg_`; the code writes
+  `large_`.
+
+### Changed
+- `generateMediaKey()` no longer takes the ignored `originalName` parameter.
+- The dead duplicate `DEFAULT_MAX_SIZE`/`DEFAULT_ALLOWED_TYPES` constants and
+  the unused `MediaValidation`/`MediaValidationOk` types in `core/types.ts` are
+  gone. (`MediaValidationError` is now the thrown error class instead of an
+  unused interface — technically a change to `/server`'s type surface.)
+
 ## 0.3.0 — 2026-08-03
 
 ### Added

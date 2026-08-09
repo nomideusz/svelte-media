@@ -5,7 +5,11 @@
 		validateImageFile,
 		generateMediaKey,
 		getStorageKey,
+		variantKey,
+		sizeForWidth,
+		parseStorageKey,
 		IMAGE_SIZES,
+		SIZE_QUALITY,
 		type StoredMedia,
 		type ImageSize,
 	} from '$lib/index.js';
@@ -14,7 +18,7 @@
 	let maxMb = $state(5);
 	let allowPng = $state(true);
 	let lastCheck = $state<
-		{ name: string; size: number; type: string; valid: boolean; error?: string } | null
+		{ name: string; size: number; type: string; valid: boolean; code?: string; error?: string } | null
 	>(null);
 
 	const allowedTypes = $derived(
@@ -37,6 +41,10 @@
 	let entityId = $state('tour_8fa21c');
 	const sampleFilename = 'mn4k2p8qw1x7.webp';
 	const SIZES: ImageSize[] = ['original', 'thumbnail', 'medium', 'large'];
+
+	// ── Joined-key helpers (real functions again) ──
+	const originalKey = $derived(getStorageKey(prefix, entityId, sampleFilename, 'original'));
+	let displayWidth = $state(640);
 
 	// ── Components, with an in-browser stand-in for the server upload ──
 	// processAndStore needs sharp and Node's Buffer, so it cannot run here. The
@@ -105,7 +113,9 @@
 		<h2>Upload &amp; gallery</h2>
 		<p class="muted">
 			Both components, live. Files stay in your browser — the upload handler here returns the same
-			<code>StoredMedia</code> shape the server pipeline would.
+			<code>StoredMedia</code> shape the server pipeline would. The <code>config</code> prop
+			pre-validates each file before <code>onUpload</code> is called and routes failures to
+			<code>onError</code> — it shares the limits with the playground below.
 		</p>
 
 		<ImageUpload
@@ -154,6 +164,7 @@
 		{#if lastCheck}
 			<div class="verdict" class:bad={!lastCheck.valid}>
 				<strong>{lastCheck.valid ? 'valid' : 'rejected'}</strong>
+				{#if lastCheck.code}<code>{lastCheck.code}</code>{/if}
 				<span class="file">{lastCheck.name}</span>
 				<span class="meta">{fmtBytes(lastCheck.size)} · {lastCheck.type || 'unknown type'}</span>
 				{#if lastCheck.error}<span class="why">{lastCheck.error}</span>{/if}
@@ -161,6 +172,15 @@
 		{:else}
 			<p class="empty">No file checked yet.</p>
 		{/if}
+
+		<p class="muted small">
+			Failures are machine-readable: <code>code</code> is
+			<code>'empty' | 'file-too-large' | 'invalid-type'</code>, joined by the
+			<code>maxBytes</code> / <code>allowedTypes</code> limit that produced it — so an app maps
+			codes to its own copy instead of surfacing the English <code>error</code> fallback. On the
+			server, <code>processAndStore</code> throws the same fields as
+			<code>MediaValidationError</code>.
+		</p>
 	</section>
 
 	<section>
@@ -178,7 +198,7 @@
 		<div class="table-wrap">
 			<table>
 				<thead>
-					<tr><th>size</th><th>dimensions</th><th>fit</th><th>key</th></tr>
+					<tr><th>size</th><th>dimensions</th><th>fit</th><th>quality</th><th>key</th></tr>
 				</thead>
 				<tbody>
 					{#each SIZES as size (size)}
@@ -189,6 +209,7 @@
 										.height}{/if}
 							</td>
 							<td>{size === 'original' ? '—' : IMAGE_SIZES[size].fit}</td>
+							<td>{SIZE_QUALITY[size]}</td>
 							<td
 								><code class="key">{getStorageKey(prefix, entityId, sampleFilename, size)}</code
 								></td
@@ -200,7 +221,54 @@
 		</div>
 		<p class="muted small">
 			Filenames come from <code>generateMediaKey()</code> — a cuid2 with a <code>.webp</code>
-			extension, because output is always WebP whatever went in.
+			extension, because output is always WebP whatever went in. The per-size name prefixes
+			(<code>thumb_</code>, <code>med_</code>, <code>large_</code>) and WebP qualities are a
+			cross-app contract, so their tables are exported: <code>SIZE_PREFIXES</code> and
+			<code>SIZE_QUALITY</code>.
+		</p>
+	</section>
+
+	<section>
+		<h2>One key, four variants</h2>
+		<p class="muted">
+			Apps that persist the single joined <code>original</code> key, rather than the (prefix,
+			entityId, filename) triple, get the layout back with these helpers — running here on the
+			key from the table above.
+		</p>
+
+		<div class="controls">
+			<label>
+				display width (px)
+				<input type="number" min="1" step="10" bind:value={displayWidth} />
+			</label>
+		</div>
+
+		<div class="table-wrap">
+			<table>
+				<thead>
+					<tr><th>call</th><th>result</th></tr>
+				</thead>
+				<tbody>
+					<tr>
+						<td><code>variantKey(key, 'thumbnail')</code></td>
+						<td><code class="key">{variantKey(originalKey, 'thumbnail')}</code></td>
+					</tr>
+					<tr>
+						<td><code>parseStorageKey(key)</code></td>
+						<td><code class="key">{JSON.stringify(parseStorageKey(originalKey))}</code></td>
+					</tr>
+					<tr>
+						<td><code>sizeForWidth({displayWidth || 'undefined'})</code></td>
+						<td><code class="key">'{sizeForWidth(displayWidth || undefined)}'</code></td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+		<p class="muted small">
+			<code>parseStorageKey</code> returns <code>null</code> for keys that don't fit the layout
+			(legacy ids), and the server-side <code>deleteMediaByKey(adapter, key)</code> treats those
+			as a no-op. <code>sizeForWidth</code> picks the smallest pre-generated variant that still
+			fills the width.
 		</p>
 	</section>
 
@@ -210,21 +278,58 @@
 			Not runnable here — this is the half that needs sharp. Call it from a route handler; the
 			credentials never leave the server.
 		</p>
-		<pre><code>{`import { createS3Adapter, processAndStore } from '@nomideusz/svelte-media';
+		<pre><code>{`import { createS3Adapter, processAndStore, deleteMediaByKey } from '@nomideusz/svelte-media/server';
 
 const storage = createS3Adapter({
   endpoint: env.S3_ENDPOINT, region: 'auto', bucket: env.S3_BUCKET,
   accessKeyId: env.S3_KEY, secretAccessKey: env.S3_SECRET,
-  publicUrl: env.S3_PUBLIC_URL, forcePathStyle: true,   // false for AWS/Railway
+  forcePathStyle: true,   // false for AWS/Railway
+  // publicUrl is optional — private buckets serve via the next section instead
 });
 
-// Validates, resizes to 4 sizes, uploads each, returns the keys
+// Validates, resizes to 4 sizes, uploads each, returns the keys.
+// A failed validation throws MediaValidationError — same code + limits as above.
 const stored = await processAndStore(storage, file, 'tours', tourId);
 
-await deleteMedia(storage, stored.prefix, stored.entityId, stored.filename);`}</code></pre>
+await deleteMediaByKey(storage, stored.sizes.original); // all four variants`}</code></pre>
 		<p class="muted small">
 			<code>createLocalAdapter(&lbrace; root &rbrace;)</code> swaps S3 for disk in development. Any
-			object with <code>put</code>, <code>delete</code> and <code>getUrl</code> works.
+			object with <code>put</code>, <code>get</code>, <code>delete</code> and <code>getUrl</code>
+			works.
+		</p>
+	</section>
+
+	<section>
+		<h2>Server: serving private buckets</h2>
+		<p class="muted">
+			Also not runnable here. Adapters read back what they wrote — <code>get(key)</code> resolves
+			<code>null</code> for a missing object — so a private bucket needs no
+			<code>publicUrl</code> at all. <code>createMediaStore</code> binds the adapter and limits
+			once per app; <code>serveMedia</code> is a complete same-origin route body.
+		</p>
+		<pre><code>{`import { createMediaStore, createS3Adapter } from '@nomideusz/svelte-media/server';
+
+const media = createMediaStore({
+  adapter: createS3Adapter({ /* config as above */ }),
+  maxFileSize: 5 * 1024 * 1024,
+  // derive: async ({ buffer }) => …   optional; result lands on stored.derived
+});
+
+// src/routes/photos/[...key]/+server.ts — key validation (incl. '..'
+// traversal), 404 on missing, immutable cache headers
+export const GET = ({ params }) => media.serve(params.key);
+
+const stored = await media.store(file, 'tours', tourId); // processAndStore, bound
+await media.remove(stored.sizes.original);               // all four variants
+
+// Or presign — S3 adapter only. Cached until just before expiry and deduped
+// in flight, so a page with many images costs one signing pass per key.
+const url = await media.signedUrl(stored.sizes.original, 'medium', 3600);`}</code></pre>
+		<p class="muted small">
+			The pieces work unbound too: <code>serveMedia(adapter, key)</code> returns a standard
+			<code>Response</code>, and <code>createS3Adapter</code> returns an <code>S3Adapter</code>
+			with <code>getSignedUrl(key, expiresIn?)</code>. The store also exposes <code>get</code>,
+			<code>url</code> (public buckets) and <code>validate</code>.
 		</p>
 	</section>
 

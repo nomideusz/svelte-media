@@ -10,6 +10,15 @@ function memoryAdapter() {
     async put(key, buffer) {
       written.set(key, buffer);
     },
+    async get(key) {
+      const buffer = written.get(key);
+      if (!buffer) return null;
+      return {
+        body: new Blob([new Uint8Array(buffer)]).stream(),
+        contentType: 'image/webp',
+        contentLength: buffer.length,
+      };
+    },
     async delete(key) {
       written.delete(key);
     },

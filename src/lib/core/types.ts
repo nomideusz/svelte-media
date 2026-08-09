@@ -2,10 +2,30 @@
 
 export type ImageSize = 'original' | 'thumbnail' | 'medium' | 'large';
 
+/** What `StorageAdapter.get` resolves for an existing object. */
+export interface StorageObject {
+  body: ReadableStream<Uint8Array>;
+  contentType: string;
+  contentLength: number | null;
+}
+
 export interface StorageAdapter {
   put(key: string, buffer: Buffer, contentType: string): Promise<void>;
+  /** null when the object doesn't exist; rejects on real failures (network, auth). */
+  get(key: string): Promise<StorageObject | null>;
   delete(key: string): Promise<void>;
+  /** Public-URL serving only — throws when the adapter has no public base URL. */
   getUrl(key: string): string;
+}
+
+/** What `createS3Adapter` actually returns — a StorageAdapter that can presign. */
+export interface S3Adapter extends StorageAdapter {
+  /**
+   * Presigned GET URL for a private bucket. Cached until shortly before
+   * expiry and deduped in flight, so page loads with many images cost one
+   * signing pass per key.
+   */
+  getSignedUrl(key: string, expiresIn?: number): Promise<string>;
 }
 
 export interface S3Config {
@@ -16,8 +36,12 @@ export interface S3Config {
   bucket: string;
   accessKeyId: string;
   secretAccessKey: string;
-  /** Base public URL for getUrl(), e.g. https://pub-xxx.r2.dev */
-  publicUrl: string;
+  /**
+   * Base public URL for getUrl(), e.g. https://pub-xxx.r2.dev. Optional —
+   * private buckets serve via `get()` (same-origin proxy) or `getSignedUrl()`
+   * instead, and `getUrl()` throws without it.
+   */
+  publicUrl?: string;
   /** Use path-style access (default: true for MinIO/R2, set false for Railway/AWS) */
   forcePathStyle?: boolean;
 }
@@ -38,20 +62,18 @@ export interface StoredMedia<TDerived = never> {
   derived?: TDerived;
 }
 
-export interface MediaValidationError {
-  isValid: false;
-  error: string;
-}
-export interface MediaValidationOk {
-  isValid: true;
-}
-export type MediaValidation = MediaValidationOk | MediaValidationError;
-
-export const DEFAULT_MAX_SIZE = 5 * 1024 * 1024; // 5 MB
-export const DEFAULT_ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+/** Machine-readable validation failure — map it to your own copy/i18n. */
+export type ValidationErrorCode = 'empty' | 'file-too-large' | 'invalid-type';
 
 export interface ValidationResult {
   valid: boolean;
+  /** Set when `valid` is false. */
+  code?: ValidationErrorCode;
+  /** The limit that produced a 'file-too-large', for message interpolation. */
+  maxBytes?: number;
+  /** The allow-list that produced an 'invalid-type'. */
+  allowedTypes?: string[];
+  /** Human-readable English fallback; apps with i18n should map `code` instead. */
   error?: string;
 }
 

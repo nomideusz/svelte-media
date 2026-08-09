@@ -1,11 +1,13 @@
 <script lang="ts">
   import type { StoredMedia, MediaConfig } from '../core/types.js';
+  import { validateImageFile } from '../core/media.js';
 
   interface Props {
     onUpload: (file: File) => Promise<StoredMedia>;
     onError?: (message: string) => void;
     maxFiles?: number;
     accept?: string;
+    /** Pre-validates each file before onUpload; failures go to onError. */
     config?: MediaConfig;
   }
 
@@ -14,6 +16,7 @@
     onError,
     maxFiles = 1,
     accept = 'image/jpeg,image/png,image/webp',
+    config,
   }: Props = $props();
 
   let dragging = $state(false);
@@ -25,6 +28,11 @@
     uploading = true;
     try {
       for (const file of Array.from(files).slice(0, maxFiles)) {
+        const validation = validateImageFile(file, config);
+        if (!validation.valid) {
+          onError?.(validation.error ?? 'Invalid file');
+          continue;
+        }
         await onUpload(file);
       }
     } catch (e) {

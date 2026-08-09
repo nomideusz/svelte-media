@@ -7,8 +7,10 @@ import type { StorageAdapter, StoredMedia, ImageSize, MediaConfig, DeriveSource 
 import {
   IMAGE_SIZES,
   SIZE_QUALITY,
+  MediaValidationError,
   generateMediaKey,
   getStorageKey,
+  parseStorageKey,
   validateImageFile,
 } from './media.js';
 
@@ -20,9 +22,9 @@ export async function processAndStore<TDerived = never>(
   config?: MediaConfig<TDerived>
 ): Promise<StoredMedia<TDerived>> {
   const validation = validateImageFile(file, config);
-  if (!validation.valid) throw new Error(validation.error);
+  if (!validation.valid) throw new MediaValidationError(validation);
 
-  const filename = generateMediaKey(file.name);
+  const filename = generateMediaKey();
   const arrayBuffer = await file.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
 
@@ -74,6 +76,17 @@ export async function deleteMedia(
     getStorageKey(prefix, entityId, filename, size)
   );
   await Promise.all(keys.map((key) => adapter.delete(key).catch(() => {})));
+}
+
+/**
+ * `deleteMedia` for apps that persist the single joined original key.
+ * Keys that don't parse (legacy ids from a previous storage system) are a
+ * silent no-op — there is nothing in object storage to delete.
+ */
+export async function deleteMediaByKey(adapter: StorageAdapter, key: string): Promise<void> {
+  const parsed = parseStorageKey(key);
+  if (!parsed) return;
+  await deleteMedia(adapter, parsed.prefix, parsed.entityId, parsed.filename);
 }
 
 export function getMediaUrl(

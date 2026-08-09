@@ -4,20 +4,29 @@
 
 export type {
   StorageAdapter,
+  S3Adapter,
   S3Config,
+  StorageObject,
   StoredMedia,
   ImageSize,
   MediaConfig,
   ValidationResult,
   ValidationConfig,
+  ValidationErrorCode,
   DeriveSource,
 } from './core/types.js';
 
 export {
   validateImageFile,
+  MediaValidationError,
   generateMediaKey,
   getStorageKey,
+  variantKey,
+  sizeForWidth,
+  parseStorageKey,
   IMAGE_SIZES,
+  SIZE_PREFIXES,
+  SIZE_QUALITY,
   DEFAULT_MAX_SIZE,
   DEFAULT_ALLOWED_TYPES,
 } from './core/media.js';

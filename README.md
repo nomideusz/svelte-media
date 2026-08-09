@@ -95,7 +95,7 @@ from the callback's return type.
 | `original` | unchanged | — | *(none)* |
 | `thumbnail` | 300×300 | `cover` | `thumb_` |
 | `medium` | 800×600 | `inside` | `med_` |
-| `large` | 1200×900 | `inside` | `lg_` |
+| `large` | 1200×900 | `inside` | `large_` |
 
 `cover` crops to fill; `inside` fits within the box and preserves aspect ratio,
 so `medium` and `large` are upper bounds rather than exact dimensions. The table
@@ -153,6 +153,11 @@ await deleteMedia(storage, stored.prefix, stored.entityId, stored.filename);
 ```
 
 ## Components
+
+> **Demo-grade.** Both production apps built on this package hand-roll their
+> upload UI (multi-file queues, form-action submission, brand styling, i18n)
+> and import only the server half. Treat these as starters to copy from, not
+> primitives to build on.
 
 ```svelte
 <script lang="ts">
