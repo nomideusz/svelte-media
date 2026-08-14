@@ -168,6 +168,12 @@ describe('getStorageKey', () => {
     const key = getStorageKey('tours', 'id', 'x.jpg', 'large');
     expect(key).toBe('tours/id/large_x.jpg');
   });
+
+  it('refuses a filename that would escape the entity folder', () => {
+    // A delete action takes the filename from a form field.
+    expect(() => getStorageKey('tours', 'id', '../../other/x.webp', 'original')).toThrow();
+    expect(() => getStorageKey('tours', 'id', 'sub/x.webp', 'original')).toThrow();
+  });
 });
 
 describe('IMAGE_SIZES', () => {

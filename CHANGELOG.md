@@ -1,5 +1,62 @@
 # Changelog
 
+## 0.6.0 — 2026-08-14
+
+Second pass of the same job 0.5.0 started: the parts of "handling images" both
+apps still owned move here, so an app keeps only what is actually its own —
+bucket names, copy, and (for yoga) what a Google Places reference costs.
+
+### Added
+- **`adapterFromEnv(env, options?)`** — the S3_*/`MEDIA_ROOT` wiring both apps
+  had hand-written, including the lazy singleton each carried. Reads
+  `S3_ENDPOINT` / `S3_REGION` / `S3_BUCKET` / `S3_ACCESS_KEY_ID` /
+  `S3_SECRET_ACCESS_KEY`, falls back to a local adapter on `MEDIA_ROOT`, and
+  otherwise throws naming what is missing — a media surface that silently
+  no-ops is worse than a boot failure. Memoized per resolved config, so
+  per-request calls reuse one client and its signed-URL cache. Takes any
+  `Record<string, string | undefined>`, so no `$env` import enters the package.
+- **`cachedImage(adapter, key, produce, options?)`** and
+  **`store.cached(...)`** — bucket-as-cache in front of a remote image source.
+  Stored copy first (the producer is never called on a hit), one producer call
+  per stampede, immutable headers, `onStoreError` for the write that would
+  otherwise silently make you pay twice. Extracted from yoga's Google Places
+  hero proxy, which had grown all of it inline.
+- **`fetchImage(url, options?)`** — GET an image from a remote URL, rejecting
+  failed and non-image responses (an error page's HTML must never land in the
+  cache as a photo), transcoded to WebP by default.
+- **`toWebp(bytes, quality?)`** — the transcode on its own; returns the input
+  untouched when sharp cannot read it, because an optimisation must never lose
+  an image you already hold.
+- **`store.resolveUrl(key, size?, expiresIn?)`** + `basePath` on
+  `MediaStoreConfig` — presigned when the adapter can sign, else
+  `basePath/<variant key>` for the same-origin route. thebest had this fallback
+  written by hand across two modules.
+- **`DeriveSource` gains `prefix` and `entityId`** (additive), so a `derive`
+  hook and its `onDeriveError` can name the entity they failed on. yoga was
+  closing over the id to log it.
+
+### Fixed
+- **`getStorageKey` rejects filenames containing `/`, `\\` or `..`.** Filenames
+  are generated, but they round-trip through DB rows and form fields before
+  coming back to be deleted — thebest's delete action passes one straight from
+  `formData`, so a crafted value reached outside the entity's own folder.
+  `serveMedia` already guarded the read path; this is the write/delete one.
+
+### Changed
+- `ImageBytes.body` is `Uint8Array<ArrayBuffer>` — the concrete view `Response`
+  and `Blob` accept.
+- README caught up with 0.5.0: `get()` on the adapter interface, `serveMedia`,
+  `createMediaStore`, `getSignedUrl`.
+
+### Adopted by the apps
+- yoga: `photo-storage.ts` is now bucket names + Polish copy + the placeholder
+  hook (−40 lines); `/api/photo` keeps the Google policy (budget guard, ref
+  self-heal, negative caches) and nothing else (−60 lines, no more sharp, no
+  more hand-rolled in-flight map).
+- thebest: `media.ts` + `image-urls.ts` lost the adapter singleton, the
+  presign-or-fallback branch and the split-brain addressing; the tour upload
+  action no longer re-states the 15 MB limit it shares with `MEDIA_CONFIG`.
+
 ## 0.5.0 — 2026-08-09
 
 ### Added

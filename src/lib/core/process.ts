@@ -55,7 +55,7 @@ export async function processAndStore<TDerived = never>(
   // make the caller retry a completed upload.
   let derived: TDerived | undefined;
   if (config?.derive) {
-    const source: DeriveSource = { buffer, filename, mimeType: file.type };
+    const source: DeriveSource = { buffer, filename, mimeType: file.type, prefix, entityId };
     try {
       derived = await config.derive(source);
     } catch (error) {

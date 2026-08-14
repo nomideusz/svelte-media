@@ -75,6 +75,13 @@ export function getStorageKey(
   filename: string,
   size: ImageSize
 ): string {
+  // Filenames are generated (`<cuid2>.webp`), but they round-trip through rows
+  // and form fields before they come back here to be deleted — a `..` segment
+  // would reach outside the entity's own folder. serveMedia guards the read
+  // path; this is the write/delete one.
+  if (filename.includes('/') || filename.includes('\\') || filename.includes('..')) {
+    throw new Error(`Invalid media filename: ${filename}`);
+  }
   const sizePrefix = SIZE_PREFIXES[size];
   return `${prefix}/${entityId}/${sizePrefix}${filename}`;
 }

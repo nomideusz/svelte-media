@@ -85,6 +85,10 @@ export interface DeriveSource {
   filename: string;
   /** The uploaded file's MIME type. */
   mimeType: string;
+  /** Storage prefix this upload went to, e.g. 'schools'. */
+  prefix: string;
+  /** The owning entity — what a failing hook needs to name in a log line. */
+  entityId: string;
 }
 
 /** The validation half of MediaConfig — all `validateImageFile` needs. */

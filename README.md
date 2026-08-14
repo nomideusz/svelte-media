@@ -34,24 +34,36 @@ the seam.
 
 ## Quick Start
 
+Bind the pipeline once per app, then call it from anywhere:
+
 ```ts
-import { createS3Adapter, processAndStore, getMediaUrl } from '@nomideusz/svelte-media/server';
+// lib/server/media.ts
+import { adapterFromEnv, createMediaStore } from '@nomideusz/svelte-media/server';
 
-const storage = createS3Adapter({
-  endpoint:        process.env.S3_ENDPOINT!,     // https://xxx.r2.cloudflarestorage.com
-  region:          'auto',                        // 'auto' for R2, 'us-east-1' for AWS
-  bucket:          process.env.S3_BUCKET!,
-  accessKeyId:     process.env.S3_KEY!,
-  secretAccessKey: process.env.S3_SECRET!,
-  publicUrl:       process.env.S3_PUBLIC_URL!,   // https://pub-xxx.r2.dev
-  forcePathStyle:  true,                          // true for MinIO/R2, false for Railway/AWS
-});
+export const media = () =>
+  createMediaStore({
+    adapter: adapterFromEnv(process.env, { forcePathStyle: false }),
+    basePath: '/api/images',          // your same-origin serving route
+    maxFileSize: 15 * 1024 * 1024,
+  });
+```
 
-const stored = await processAndStore(storage, file, 'tours', tourId);
+`adapterFromEnv` reads `S3_ENDPOINT` / `S3_REGION` / `S3_BUCKET` /
+`S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY`, falls back to local files when only
+`MEDIA_ROOT` is set, and throws naming what is missing otherwise. It memoizes
+per config, so calling it every request reuses one client (and its signed-URL
+cache). Pass any `{ [key]: string | undefined }` — SvelteKit's
+`$env/dynamic/private` works as-is.
+
+```ts
+const stored = await media().store(file, 'tours', tourId);
 // { filename, originalName, prefix, entityId, sizes: { original, thumbnail, medium, large } }
 
-const src = getMediaUrl(storage, stored.prefix, stored.entityId, stored.filename, 'medium');
+const src = await media().resolveUrl(stored.sizes.original, 'medium');
 ```
+
+Prefer the lower-level `createS3Adapter` / `processAndStore` when you want the
+adapter built from something other than env vars.
 
 Store `stored` on your row — the helpers below all take
 `(prefix, entityId, filename)`, so keep those three. Nothing in the package
@@ -103,24 +115,31 @@ is exported as `IMAGE_SIZES`.
 
 ## Storage adapters
 
-The seam is three methods:
+The seam is four methods:
 
 ```ts
 interface StorageAdapter {
   put(key: string, buffer: Buffer, contentType: string): Promise<void>;
+  get(key: string): Promise<StorageObject | null>;   // null = missing; rejects on real failures
   delete(key: string): Promise<void>;
-  getUrl(key: string): string;
+  getUrl(key: string): string;                       // throws without a publicUrl
 }
 ```
 
-Two ship with the package:
+Two ship with the package, plus the env-driven picker:
 
 ```ts
-import { createS3Adapter, createLocalAdapter } from '@nomideusz/svelte-media/server';
+import {
+  adapterFromEnv, createS3Adapter, createLocalAdapter,
+} from '@nomideusz/svelte-media/server';
 
-createS3Adapter({ /* S3Config, above */ });   // R2, MinIO, Tigris, AWS
+adapterFromEnv(process.env, { bucket: 'photos', region: 'garage' }); // S3, else MEDIA_ROOT
+createS3Adapter({ /* S3Config, above */ });   // R2, MinIO, Garage, Tigris, AWS
 createLocalAdapter({ root: '/data/images' }); // writes under root, mkdir -p
 ```
+
+`createS3Adapter` also returns `getSignedUrl(key, expiresIn?)` for private
+buckets, with expiry-buffered caching and in-flight dedupe.
 
 Anything satisfying the interface works — write your own for a CDN or a test
 double.
@@ -151,6 +170,44 @@ import { deleteMedia } from '@nomideusz/svelte-media/server';
 // Removes all four sizes; individual failures are swallowed
 await deleteMedia(storage, stored.prefix, stored.entityId, stored.filename);
 ```
+
+## Serving
+
+A same-origin route is the whole of `serveMedia` — key validation (including
+`..` traversal), 404 on missing, immutable cache headers:
+
+```ts
+// routes/photos/[...key]/+server.ts
+export const GET = ({ params }) => media().serve(params.key);
+```
+
+`store.resolveUrl(key, size?)` picks the right URL for whichever storage you
+ended up with: a presigned URL when the adapter can sign, else
+`basePath/<variant key>` pointing at that route.
+
+## Caching remote images
+
+For images that come from somewhere else — a billed photo API, a partner CDN —
+`cached()` turns your bucket into the cache in front of it:
+
+```ts
+import { fetchImage } from '@nomideusz/svelte-media/server';
+
+const res = await media().cached(
+  `schools/${id}/hero.webp`,
+  () => fetchImage(`https://api.example/photo/${ref}`),   // only on a miss
+  { onStoreError: (e, key) => log.error(`write failed for ${key}`, e) },
+);
+if (!res) error(404, 'No photo');
+return res;
+```
+
+A stored copy is streamed without calling the producer at all; concurrent misses
+for one key share a single producer call, so a CDN stampede buys one copy rather
+than one per PoP. `fetchImage` rejects non-image and failed responses (an error
+page's HTML must never land in the cache as a photo) and transcodes to WebP —
+`toWebp` on its own does that half, returning the input untouched if sharp
+cannot read it.
 
 ## Components
 
@@ -195,10 +252,18 @@ the same reason: it renders on the client, where the adapter cannot go.
 
 ```ts
 // ── @nomideusz/svelte-media/server ──
-createS3Adapter(config: S3Config): StorageAdapter
+adapterFromEnv(env, options?): StorageAdapter            // S3_* / MEDIA_ROOT, memoized
+createS3Adapter(config: S3Config): S3Adapter
 createLocalAdapter(config: LocalConfig): StorageAdapter
+createMediaStore({ adapter, basePath?, ...limits, derive? }): MediaStore
+  // .store .remove .get .serve .url .signedUrl .resolveUrl .cached .validate
 processAndStore(adapter, file, prefix, entityId, config?): Promise<StoredMedia>
 deleteMedia(adapter, prefix, entityId, filename): Promise<void>
+deleteMediaByKey(adapter, key): Promise<void>            // joined original key
+serveMedia(adapter, key): Promise<Response>
+cachedImage(adapter, key, produce, options?): Promise<Response | null>
+fetchImage(url, options?): Promise<ImageBytes | null>
+toWebp(bytes, quality = 80): Promise<ImageBytes>
 getMediaUrl(adapter, prefix, entityId, filename, size = 'medium'): string
 
 // ── @nomideusz/svelte-media (client-safe) ──
@@ -211,8 +276,10 @@ ImageUpload, ImageGallery
 
 Key helpers are exported from both entries, so server code needs only one import.
 
-Types: `StorageAdapter`, `S3Config`, `LocalConfig`, `StoredMedia`, `ImageSize`,
-`MediaConfig`, `ValidationResult`.
+Types: `StorageAdapter`, `S3Adapter`, `StorageObject`, `S3Config`,
+`LocalConfig`, `MediaStore`, `MediaStoreConfig`, `StoredMedia`, `ImageSize`,
+`MediaConfig`, `ValidationResult`, `ValidationErrorCode`, `DeriveSource`,
+`ImageBytes`, `EnvAdapterOptions`.
 
 ## Development
 

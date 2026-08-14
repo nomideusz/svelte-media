@@ -3,6 +3,10 @@
 export type { LocalConfig } from '../core/local-adapter.js';
 export { createS3Adapter } from '../core/adapter.js';
 export { createLocalAdapter } from '../core/local-adapter.js';
+export { adapterFromEnv } from '../core/env.js';
+export type { EnvAdapterOptions, EnvSource } from '../core/env.js';
+export { cachedImage, fetchImage, toWebp } from '../core/remote.js';
+export type { CachedImageOptions, FetchImageOptions, ImageBytes } from '../core/remote.js';
 export { processAndStore, deleteMedia, deleteMediaByKey, getMediaUrl } from '../core/process.js';
 export { serveMedia } from '../core/serve.js';
 export { createMediaStore } from '../core/store.js';

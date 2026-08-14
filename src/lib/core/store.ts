@@ -10,9 +10,16 @@ import type {
 import { validateImageFile, variantKey } from './media.js';
 import { processAndStore, deleteMediaByKey } from './process.js';
 import { serveMedia } from './serve.js';
+import { cachedImage, type CachedImageOptions, type ImageBytes } from './remote.js';
 
 export interface MediaStoreConfig<TDerived = never> extends MediaConfig<TDerived> {
   adapter: StorageAdapter;
+  /**
+   * Where the same-origin serving route lives, e.g. `'/photos'` or
+   * `'/api/images'` — what `resolveUrl` falls back to when the adapter cannot
+   * presign (local dev, public buckets).
+   */
+  basePath?: string;
 }
 
 /**
@@ -37,6 +44,21 @@ export interface MediaStore<TDerived = never> {
   url(key: string, size?: ImageSize): string;
   /** Presigned URL for a size variant — rejects unless the adapter is S3. */
   signedUrl(key: string, size?: ImageSize, expiresIn?: number): Promise<string>;
+  /**
+   * The URL to hand a browser: presigned when the adapter can sign (a private
+   * bucket in production), else `basePath/key` for the same-origin route.
+   * Both apps had written that fallback by hand.
+   */
+  resolveUrl(key: string, size?: ImageSize, expiresIn?: number): Promise<string>;
+  /**
+   * `cachedImage` with the bound adapter — serve a key from storage, buying it
+   * from `produce` once on the first miss.
+   */
+  cached(
+    key: string,
+    produce: () => Promise<ImageBytes | null>,
+    options?: CachedImageOptions
+  ): Promise<Response | null>;
   /** `validateImageFile` with the bound limits. */
   validate(file: File): ValidationResult;
 }
@@ -44,7 +66,8 @@ export interface MediaStore<TDerived = never> {
 export function createMediaStore<TDerived = never>(
   config: MediaStoreConfig<TDerived>
 ): MediaStore<TDerived> {
-  const { adapter, ...media } = config;
+  const { adapter, basePath, ...media } = config;
+  const signer = (adapter as Partial<S3Adapter>).getSignedUrl?.bind(adapter);
   return {
     adapter,
     store: (file, prefix, entityId) => processAndStore(adapter, file, prefix, entityId, media),
@@ -53,12 +76,20 @@ export function createMediaStore<TDerived = never>(
     serve: (key) => serveMedia(adapter, key),
     url: (key, size = 'original') => adapter.getUrl(variantKey(key, size)),
     signedUrl: (key, size = 'original', expiresIn) => {
-      const s3 = adapter as Partial<S3Adapter>;
-      if (!s3.getSignedUrl) {
+      if (!signer) {
         return Promise.reject(new Error('signedUrl needs an S3 adapter (getSignedUrl)'));
       }
-      return s3.getSignedUrl(variantKey(key, size), expiresIn);
+      return signer(variantKey(key, size), expiresIn);
     },
+    resolveUrl: async (key, size = 'original', expiresIn) => {
+      const variant = variantKey(key, size);
+      if (signer) return signer(variant, expiresIn);
+      if (!basePath) {
+        throw new Error('resolveUrl needs an S3 adapter or a basePath for the serving route');
+      }
+      return `${basePath.replace(/\/$/, '')}/${variant}`;
+    },
+    cached: (key, produce, options) => cachedImage(adapter, key, produce, options),
     validate: (file) => validateImageFile(file, media),
   };
 }
