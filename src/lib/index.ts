@@ -31,5 +31,7 @@ export {
   DEFAULT_ALLOWED_TYPES,
 } from './core/media.js';
 
-export { default as ImageUpload } from './components/ImageUpload.svelte';
-export { default as ImageGallery } from './components/ImageGallery.svelte';
+// ImageUpload / ImageGallery left the public API at 1.0: in two consuming
+// apps neither was ever rendered, and this package's own changelog records
+// the surface shipping broken twice precisely because nothing consumed it.
+// The files remain for the demo; re-exporting later is an additive minor.

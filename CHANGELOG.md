@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.0.0
+
+### Major Changes
+
+- 1.0.0 — the promise, sized to the proven surface. Two production apps
+  consume the validation, media store, env adapters, storage keys,
+  remote-image fetching and serving daily; 53 tests cover them; that API is
+  now stable, and anything that breaks a consumer costs a major.
+  
+  **Breaking: `ImageUpload` and `ImageGallery` leave the public API.** In two
+  consuming apps neither was ever rendered, and this package's own changelog
+  records that surface shipping broken twice precisely because nothing
+  consumed it (a `config` prop that was never read; a build failure nobody
+  hit). A 1.0 must not promise stability on components without a single real
+  consumer. The files remain in-repo for the demo; if an app one day wants
+  them, re-exporting is an additive minor made against a component that
+  consumer actually exercises.
+
 ## 0.6.0 — 2026-08-14
 
 Second pass of the same job 0.5.0 started: the parts of "handling images" both

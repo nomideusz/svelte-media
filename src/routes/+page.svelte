@@ -1,7 +1,7 @@
 <script lang="ts">
+	import ImageUpload from '#lib/components/ImageUpload.svelte';
+	import ImageGallery from '#lib/components/ImageGallery.svelte';
 	import {
-		ImageUpload,
-		ImageGallery,
 		validateImageFile,
 		generateMediaKey,
 		getStorageKey,
@@ -12,7 +12,7 @@
 		SIZE_QUALITY,
 		type StoredMedia,
 		type ImageSize,
-	} from '$lib/index.js';
+	} from '#lib/index.js';
 
 	// ── Validation playground (the real function, running in your browser) ──
 	let maxMb = $state(5);

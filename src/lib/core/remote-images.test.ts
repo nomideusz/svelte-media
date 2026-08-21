@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import sharp from 'sharp';
-import { cachedImage, fetchImage, toWebp, type ImageBytes } from './remote.js';
+import { cachedImage, fetchImage, toWebp, type ImageBytes } from './remote-images.js';
 import type { StorageAdapter, StorageObject } from './types.js';
 
 function memoryAdapter(failWrites = false) {

@@ -1,4 +1,5 @@
 // packages/svelte-media/src/lib/core/types.ts
+/// <reference types="node" preserve="true" />
 
 export type ImageSize = 'original' | 'thumbnail' | 'medium' | 'large';
 

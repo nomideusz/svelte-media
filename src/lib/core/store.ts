@@ -10,7 +10,7 @@ import type {
 import { validateImageFile, variantKey } from './media.js';
 import { processAndStore, deleteMediaByKey } from './process.js';
 import { serveMedia } from './serve.js';
-import { cachedImage, type CachedImageOptions, type ImageBytes } from './remote.js';
+import { cachedImage, type CachedImageOptions, type ImageBytes } from './remote-images.js';
 
 export interface MediaStoreConfig<TDerived = never> extends MediaConfig<TDerived> {
   adapter: StorageAdapter;

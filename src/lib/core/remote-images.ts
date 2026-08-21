@@ -1,6 +1,10 @@
 // Caching images that come from somewhere else — a paid photo API, a partner
 // CDN, a scraper. Server-only (sharp).
 //
+// kit 3 claims any file named `remote.*` as a remote-functions module
+// (pattern /[/.]remote\.[^/]+$/) and rejects its plain exports — hence
+// `remote-images`, not `remote`.
+//
 // Extracted from yoga's Google Places hero proxy, which was paying Google per
 // origin miss until it grew a bucket cache, a stampede lock and a transcode
 // step around it. All three are storage plumbing, not Places knowledge: what
