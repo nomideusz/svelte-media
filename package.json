@@ -1,6 +1,6 @@
 {
   "name": "@nomideusz/svelte-media",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Image upload, processing, and S3-compatible storage for Svelte 5 apps.",
   "type": "module",
   "sideEffects": false,
@@ -45,22 +45,22 @@
     "svelte": "^5.0.0"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1079.0",
-    "@aws-sdk/s3-request-presigner": "^3.1079.0",
-    "@paralleldrive/cuid2": "^2.3.1",
-    "sharp": "^0.34.5"
+    "@aws-sdk/client-s3": "^3.1161.0",
+    "@aws-sdk/s3-request-presigner": "^3.1161.0",
+    "@paralleldrive/cuid2": "^3.3.0",
+    "sharp": "^0.35.5"
   },
   "devDependencies": {
     "@sveltejs/adapter-auto": "^8.0.0",
-    "@sveltejs/kit": "^3.0.0",
-    "@sveltejs/package": "^3.0.0",
-    "@sveltejs/vite-plugin-svelte": "^7.3.0",
-    "@types/node": "^25.9.4",
-    "svelte": "^5.57.1",
-    "svelte-check": "^4.7.1",
+    "@sveltejs/kit": "^3.1.1",
+    "@sveltejs/package": "^3.0.2",
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
+    "@types/node": "^25.9.9",
+    "svelte": "^5.57.3",
+    "svelte-check": "^4.7.7",
     "typescript": "^6.0.3",
-    "vite": "^8.3.0",
-    "vitest": "^4.1.10"
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
   },
   "keywords": [
     "svelte",

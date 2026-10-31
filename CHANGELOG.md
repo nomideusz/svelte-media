@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.1
+
+### Patch Changes
+
+- Dependencies: `sharp` 0.34 → 0.35 (no removed API is used), `@paralleldrive/cuid2` 2 → 3 (same `createId`), `@aws-sdk/*` 3.1079 → 3.1161. No API change.
+
 ## 1.0.0
 
 ### Major Changes
